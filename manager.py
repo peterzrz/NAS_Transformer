@@ -7,11 +7,54 @@ import tensorflow as tf
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+
+class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+  def __init__(self, d_model, warmup_steps=4000):
+    super().__init__()
+
+    self.d_model = d_model
+    self.d_model = tf.cast(self.d_model, tf.float32)
+
+    self.warmup_steps = warmup_steps
+
+  def __call__(self, step):
+    step = tf.cast(step, dtype=tf.float32)
+    arg1 = tf.math.rsqrt(step)
+    arg2 = step * (self.warmup_steps ** -1.5)
+
+    return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
+
+def masked_loss(label, pred):
+  mask = label != 0
+  loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
+    from_logits=True, reduction='none')
+  loss = loss_object(label, pred)
+
+  mask = tf.cast(mask, dtype=loss.dtype)
+  loss *= mask
+
+  loss = tf.reduce_sum(loss)/tf.reduce_sum(mask)
+  return loss
+
+
+def masked_accuracy(label, pred):
+  pred = tf.argmax(pred, axis=2)
+  label = tf.cast(label, pred.dtype)
+  match = label == pred
+
+  mask = label != 0
+
+  match = match & mask
+
+  match = tf.cast(match, dtype=tf.float32)
+  mask = tf.cast(mask, dtype=tf.float32)
+  return tf.reduce_sum(match)/tf.reduce_sum(mask)
+
 class NetworkManager:
     '''
     Helper class to manage the generation of subnetwork training given a dataset
     '''
-    def __init__(self, dataset, epochs=5, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0):
+    def __init__(self, train_batches, val_batches, epochs=20, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0):
         '''
         Manager which is tasked with creating subnetworks, training them on a dataset, and retrieving
         rewards in the term of accuracy, which is passed to the controller RNN.
@@ -24,7 +67,8 @@ class NetworkManager:
             clip_rewards: float - to clip rewards in [-range, range] to prevent
                 large weight updates. Use when training is highly unstable.
         '''
-        self.dataset = dataset
+        self.train_batches = train_batches
+        self.val_batches = val_batches
         self.epochs = epochs
         self.batchsize = child_batchsize
         self.clip_rewards = clip_rewards
@@ -64,24 +108,31 @@ class NetworkManager:
 
             # generate a submodel given predicted actions
             model = model_fn(actions)  # type: Model
-            model.compile('adam', 'categorical_crossentropy', metrics=['accuracy'])
+            
+            learning_rate = CustomSchedule(128)
+            optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+                                                epsilon=1e-9)
+            model.compile(
+                loss=masked_loss,
+                optimizer=optimizer,
+                metrics=[masked_accuracy])
 
-            # unpack the dataset
-            X_train, y_train, X_val, y_val = self.dataset
+            model.fit(self.train_batches,
+                            epochs=self.epochs,
+                            validation_data=self.val_batches)
 
-            # train the model using Keras methods
+
+            '''# train the model using Keras methods
             model.fit(X_train, y_train, batch_size=self.batchsize, epochs=self.epochs,
                       verbose=1, validation_data=(X_val, y_val),
                       callbacks=[ModelCheckpoint('weights/temp_network.h5',
                                                  monitor='val_acc', verbose=1,
                                                  save_best_only=True,
                                                  save_weights_only=True)])
-
-            # load best performance epoch in this training session
-            model.load_weights('weights/temp_network.h5')
+            '''
 
             # evaluate the model
-            loss, acc = model.evaluate(X_val, y_val, batch_size=self.batchsize)
+            loss, acc = model.evaluate(self.val_batches)
 
             # compute the reward
             reward = (acc - self.moving_acc)
