@@ -9,6 +9,8 @@ from keras.utils import to_categorical
 from controller import Controller, StateSpace
 from manager import NetworkManager
 from model import model_fn
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # create a shared session between Keras and Tensorflow
 policy_sess = tf.Session()

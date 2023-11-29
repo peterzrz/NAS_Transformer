@@ -1,6 +1,8 @@
 from keras.models import Model
 from keras.layers import Input, Dense, Conv2D, GlobalAveragePooling2D
 from transformer import Transformer
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 

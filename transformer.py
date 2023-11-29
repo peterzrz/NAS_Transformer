@@ -21,6 +21,7 @@ Original file is located at
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 """<style>
 td {
   text-align: center;
@@ -138,8 +139,10 @@ import matplotlib.pyplot as plt
 
 import tensorflow_datasets as tfds
 import tensorflow as tf
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
-# import tensorflow_text ???
+import tensorflow_text 
 
 """## Data handling
 

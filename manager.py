@@ -4,6 +4,8 @@ from keras.models import Model
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint
 import tensorflow as tf
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 class NetworkManager:
     '''

@@ -5,6 +5,8 @@ from collections import OrderedDict
 
 from keras import backend as K
 import tensorflow as tf
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 import os
 if not os.path.exists('weights/'):

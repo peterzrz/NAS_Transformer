@@ -8,6 +8,8 @@ from keras.layers import RNN
 from keras.layers.recurrent import _generate_dropout_mask, _generate_dropout_ones
 
 import warnings
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 #import tensorflow as tf
 #import tensorflow.contrib.rnn as rnn
