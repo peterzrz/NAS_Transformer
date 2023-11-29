@@ -6,6 +6,17 @@ from keras import backend as K
 from keras.datasets import cifar10
 from keras.utils import to_categorical
 
+import logging
+import time
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+import tensorflow_datasets as tfds
+import tensorflow as tf
+
+import tensorflow_text
+
 from controller import Controller, StateSpace
 from manager import NetworkManager
 from model import model_fn
@@ -27,6 +38,32 @@ ACCURACY_BETA = 0.8  # beta value for the moving average of the accuracy
 CLIP_REWARDS = 0.0  # clip rewards in the [-0.05, 0.05] range
 RESTORE_CONTROLLER = True  # restore controller to continue training
 
+MAX_TOKENS=128
+BUFFER_SIZE = 20000
+BATCH_SIZE = 64
+
+  
+def prepare_batch(pt, en):
+    pt = tokenizers.pt.tokenize(pt)      # Output is ragged.
+    pt = pt[:, :MAX_TOKENS]    # Trim to MAX_TOKENS.
+    pt = pt.to_tensor()  # Convert to 0-padded dense Tensor
+
+    en = tokenizers.en.tokenize(en)
+    en = en[:, :(MAX_TOKENS+1)]
+    en_inputs = en[:, :-1].to_tensor()  # Drop the [END] tokens
+    en_labels = en[:, 1:].to_tensor()   # Drop the [START] tokens
+
+    return (pt, en_inputs), en_labels
+
+
+def make_batches(ds):
+  return (
+      ds
+      .shuffle(BUFFER_SIZE)
+      .batch(BATCH_SIZE)
+      .map(prepare_batch, tf.data.AUTOTUNE)
+      .prefetch(buffer_size=tf.data.AUTOTUNE))
+
 # construct a state space
 state_space = StateSpace()
 
@@ -38,13 +75,23 @@ state_space.add_state(name='filters', values=[16, 32, 64])
 state_space.print_state_space()
 
 # prepare the training data for the NetworkManager
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
-x_train = x_train.astype('float32') / 255.
-x_test = x_test.astype('float32') / 255.
-y_train = to_categorical(y_train, 10)
-y_test = to_categorical(y_test, 10)
+#fetch data
+examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en',
+                               with_info=True,
+                               as_supervised=True)
 
-dataset = [x_train, y_train, x_test, y_test]  # pack the dataset for the NetworkManager
+train_examples, val_examples = examples['train'], examples['validation']
+#Set up tokenizer
+model_name = 'ted_hrlr_translate_pt_en_converter'
+tf.keras.utils.get_file(
+    f'{model_name}.zip',
+    f'https://storage.googleapis.com/download.tensorflow.org/models/{model_name}.zip',
+    cache_dir='.', cache_subdir='', extract=True
+)
+tokenizers = tf.saved_model.load(model_name)
+
+train_batches = make_batches(train_examples)
+val_batches = make_batches(val_examples)
 
 previous_acc = 0.0
 total_reward = 0.0
@@ -59,7 +106,7 @@ with policy_sess.as_default():
                             restore_controller=RESTORE_CONTROLLER)
 
 # create the Network Manager
-manager = NetworkManager(dataset, epochs=MAX_EPOCHS, child_batchsize=CHILD_BATCHSIZE, clip_rewards=CLIP_REWARDS,
+manager = NetworkManager(train_batches, val_batches, epochs=MAX_EPOCHS, child_batchsize=CHILD_BATCHSIZE, clip_rewards=CLIP_REWARDS,
                          acc_beta=ACCURACY_BETA)
 
 # get an initial random state space if controller needs to predict an
