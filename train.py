@@ -31,8 +31,7 @@ RESTORE_CONTROLLER = True  # restore controller to continue training
 state_space = StateSpace()
 
 # add states
-state_space.add_state(name='kernel', values=[1, 3])
-state_space.add_state(name='filters', values=[16, 32, 64])
+state_space.add_state(name='activation', values=["relu", "softmax"]) # add the activation tuning
 
 # print the state space being searched
 state_space.print_state_space()

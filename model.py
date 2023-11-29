@@ -7,7 +7,7 @@ from transformer import Transformer
 # generic model design
 def model_fn(actions):
     # unpack the actions from the list
-    kernel_1, filters_1, act_1, kernel_2, filters_2, kernel_3, filters_3, kernel_4, filters_4 = actions
+    act_1, act_2, act_3, act_4 = actions
 
     num_layers = 4
     d_model = 128
@@ -23,6 +23,6 @@ def model_fn(actions):
         input_vocab_size=7765,
         target_vocab_size=7010,
         dropout_rate=dropout_rate,
-        activation_encoder=[],
-        activation_decoder=[])
+        activation_encoder=[act_1, act_2, act_3, act_4],
+        activation_decoder=[act_1, act_2, act_3, act_4])
     return model
