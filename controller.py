@@ -256,7 +256,7 @@ class Controller:
             with self.policy_session.as_default():
                 K.set_session(self.policy_session)
 
-                with tf.name_scope('action_prediction'):
+                with tf.compat.v1.name_scope('action_prediction'):
                     pred_actions = self.policy_session.run(self.policy_actions, feed_dict={self.state_input: state})
 
                 return pred_actions
@@ -266,37 +266,37 @@ class Controller:
         with self.policy_session.as_default():
             K.set_session(self.policy_session)
 
-            with tf.name_scope('controller'):
-                with tf.variable_scope('policy_network'):
+            with tf.compat.v1.name_scope('controller'):
+                with tf.compat.v1.variable_scope('policy_network'):
 
                     # state input is the first input fed into the controller RNN.
                     # the rest of the inputs are fed to the RNN internally
-                    with tf.name_scope('state_input'):
-                        state_input = tf.placeholder(dtype=tf.int32, shape=(1, None), name='state_input')
+                    with tf.compat.v1.name_scope('state_input'):
+                        state_input = tf.compat.v1.placeholder(dtype=tf.int32, shape=(1, None), name='state_input')
 
                     self.state_input = state_input
 
                     # we can use LSTM as the controller as well
-                    nas_cell = tf.nn.rnn_cell.LSTMCell(self.controller_cells)
+                    nas_cell = tf.compat.v1.nn.rnn_cell.LSTMCell(self.controller_cells)
                     cell_state = nas_cell.zero_state(batch_size=1, dtype=tf.float32)
 
                     embedding_weights = []
 
                     # for each possible state, create a new embedding. Reuse the weights for multiple layers.
-                    with tf.variable_scope('embeddings', reuse=tf.AUTO_REUSE):
+                    with tf.compat.v1.variable_scope('embeddings', reuse=tf.compat.v1.AUTO_REUSE):
                         for i in range(self.state_size):
                             state_ = self.state_space[i]
                             size = state_['size']
 
                             # size + 1 is used so that 0th index is never updated and is "default" value
-                            weights = tf.get_variable('state_embeddings_%d' % i,
+                            weights = tf.compat.v1.get_variable('state_embeddings_%d' % i,
                                                       shape=[size + 1, self.embedding_dim],
-                                                      initializer=tf.initializers.random_uniform(-1., 1.))
+                                                      initializer=tf.compat.v1.initializers.random_uniform(-1., 1.))
 
                             embedding_weights.append(weights)
 
                         # initially, cell input will be 1st state input
-                        embeddings = tf.nn.embedding_lookup(embedding_weights[0], state_input)
+                        embeddings = tf.compat.v1.nn.embedding_lookup(embedding_weights[0], state_input)
 
                     cell_input = embeddings
 
@@ -306,17 +306,17 @@ class Controller:
                         state_space = self.state_space[i]
                         size = state_space['size']
 
-                        with tf.name_scope('controller_output_%d' % i):
+                        with tf.compat.v1.name_scope('controller_output_%d' % i):
                             # feed the ith layer input (i-1 layer output) to the RNN
-                            outputs, final_state = tf.nn.dynamic_rnn(nas_cell,
+                            outputs, final_state = tf.compat.v1.nn.dynamic_rnn(nas_cell,
                                                                      cell_input,
                                                                      initial_state=cell_state,
                                                                      dtype=tf.float32)
 
                             # add a new classifier for each layers output
-                            classifier = tf.layers.dense(outputs[:, -1, :], units=size, name='classifier_%d' % (i),
+                            classifier = tf.compat.v1.layers.dense(outputs[:, -1, :], units=size, name='classifier_%d' % (i),
                                                          reuse=False)
-                            preds = tf.nn.softmax(classifier)
+                            preds = tf.compat.v1.nn.softmax(classifier)
 
                             # feed the previous layer (i-1 layer output) to the next layers input, along with state
                             # take the class label
@@ -326,7 +326,7 @@ class Controller:
                             cell_input = tf.add(cell_input, 1)  # we avoid using 0 so as to have a "default" embedding at 0th index
 
                             # embedding lookup of this state using its state weights ; reuse weights
-                            cell_input = tf.nn.embedding_lookup(embedding_weights[state_id], cell_input,
+                            cell_input = tf.compat.v1.nn.embedding_lookup(embedding_weights[state_id], cell_input,
                                                            name='cell_output_%d' % (i))
 
                             cell_state = final_state
@@ -336,21 +336,21 @@ class Controller:
                         self.policy_classifiers.append(classifier)
                         self.policy_actions.append(preds)
 
-            policy_net_variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='policy_network')
+            policy_net_variables = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope='policy_network')
 
-            with tf.name_scope('optimizer'):
-                self.global_step = tf.Variable(0, trainable=False)
+            with tf.compat.v1.name_scope('optimizer'):
+                self.global_step = tf.compat.v1.Variable(0, trainable=False)
                 starter_learning_rate = 0.1
-                learning_rate = tf.train.exponential_decay(starter_learning_rate, self.global_step,
+                learning_rate = tf.compat.v1.train.exponential_decay(starter_learning_rate, self.global_step,
                                                            500, 0.95, staircase=True)
 
-                tf.summary.scalar('learning_rate', learning_rate)
+                tf.compat.v1.summary.scalar('learning_rate', learning_rate)
 
-                self.optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
+                self.optimizer = tf.compat.v1.train.RMSPropOptimizer(learning_rate=learning_rate)
 
-            with tf.name_scope('losses'):
-                self.discounted_rewards = tf.placeholder(tf.float32, shape=(None,), name='discounted_rewards')
-                tf.summary.scalar('discounted_reward', tf.reduce_sum(self.discounted_rewards))
+            with tf.compat.v1.name_scope('losses'):
+                self.discounted_rewards = tf.compat.v1.placeholder(tf.float32, shape=(None,), name='discounted_rewards')
+                tf.compat.v1.summary.scalar('discounted_reward', tf.reduce_sum(self.discounted_rewards))
 
                 # calculate sum of all the individual classifiers
                 cross_entropy_loss = 0
@@ -359,12 +359,12 @@ class Controller:
                     state_space = self.state_space[i]
                     size = state_space['size']
 
-                    with tf.name_scope('state_%d' % (i + 1)):
-                        labels = tf.placeholder(dtype=tf.float32, shape=(None, size), name='cell_label_%d' % i)
+                    with tf.compat.v1.name_scope('state_%d' % (i + 1)):
+                        labels = tf.compat.v1.placeholder(dtype=tf.float32, shape=(None, size), name='cell_label_%d' % i)
                         self.policy_labels.append(labels)
 
-                        ce_loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=classifier, labels=labels)
-                        tf.summary.scalar('state_%d_ce_loss' % (i + 1), tf.reduce_mean(ce_loss))
+                        ce_loss = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(logits=classifier, labels=labels)
+                        tf.compat.v1.summary.scalar('state_%d_ce_loss' % (i + 1), tf.reduce_mean(ce_loss))
 
                     cross_entropy_loss += ce_loss
 
@@ -373,11 +373,11 @@ class Controller:
 
                 # sum up policy gradient and regularization loss
                 self.total_loss = policy_gradient_loss + self.reg_strength * reg_loss
-                tf.summary.scalar('total_loss', self.total_loss)
+                tf.compat.v1.summary.scalar('total_loss', self.total_loss)
 
                 self.gradients = self.optimizer.compute_gradients(self.total_loss)
 
-                with tf.name_scope('policy_gradients'):
+                with tf.compat.v1.name_scope('policy_gradients'):
                     # normalize gradients so that they dont explode if argument passed
                     if self.clip_norm is not None and self.clip_norm != 0.0:
                         norm = tf.constant(self.clip_norm, dtype=tf.float32)
@@ -391,24 +391,26 @@ class Controller:
                             self.gradients[i] = (grad * self.discounted_rewards, var)
 
                 # training update
-                with tf.name_scope("train_policy_network"):
+                with tf.compat.v1.name_scope("train_policy_network"):
                     # apply gradients to update policy network
                     self.train_op = self.optimizer.apply_gradients(self.gradients, global_step=self.global_step)
 
-            self.summaries_op = tf.summary.merge_all()
+            self.summaries_op = tf.compat.v1.summary.merge_all()
 
             timestr = time.strftime("%Y-%m-%d-%H-%M-%S")
             filename = 'logs/%s' % timestr
 
-            self.summary_writer = tf.summary.FileWriter(filename, graph=self.policy_session.graph)
+            self.summary_writer = tf.compat.v1.summary.FileWriter(filename, graph=self.policy_session.graph)
+            # self.summary_writer = tf.compat.v1.summary.FileWriter(filename, graph=tf.Graph())
+ 
 
-            self.policy_session.run(tf.global_variables_initializer())
-            self.saver = tf.train.Saver(max_to_keep=1)
+            self.policy_session.run(tf.compat.v1.global_variables_initializer())
+            self.saver = tf.compat.v1.train.Saver(max_to_keep=1)
 
             if self.restore_controller:
-                path = tf.train.latest_checkpoint('weights/')
+                path = tf.compat.v1.train.latest_checkpoint('weights/')
 
-                if path is not None and tf.train.checkpoint_exists(path):
+                if path is not None and tf.compat.v1.train.checkpoint_exists(path):
                     print("Loading Controller Checkpoint !")
                     self.saver.restore(self.policy_session, path)
 

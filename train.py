@@ -23,9 +23,12 @@ from model import model_fn
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+tf.compat.v1.disable_eager_execution()
+
 # create a shared session between Keras and Tensorflow
-policy_sess = tf.Session()
+policy_sess = tf.compat.v1.Session()
 K.set_session(policy_sess)
+print(policy_sess)
 
 NUM_LAYERS = 4  # number of layers of the state space
 MAX_TRIALS = 250  # maximum number of models generated
@@ -98,6 +101,7 @@ previous_acc = 0.0
 total_reward = 0.0
 
 with policy_sess.as_default():
+    print(policy_sess)
     # create the Controller and build the internal policy network
     controller = Controller(policy_sess, NUM_LAYERS, state_space,
                             reg_param=REGULARIZATION,
@@ -130,6 +134,7 @@ for trial in range(MAX_TRIALS):
     print("Predicted actions : ", state_space.parse_state_space_list(actions))
 
     # build a model, train and get reward and accuracy from the network manager
+    print(policy_sess)
     reward, previous_acc = manager.get_rewards(model_fn, state_space.parse_state_space_list(actions))
     print("Rewards : ", reward, "Accuracy : ", previous_acc)
 

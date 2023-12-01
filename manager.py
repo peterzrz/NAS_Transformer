@@ -8,7 +8,7 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+class CustomSchedule(tf.compat.v1.keras.optimizers.schedules.LearningRateSchedule):
   def __init__(self, d_model, warmup_steps=4000):
     super().__init__()
 
@@ -103,21 +103,23 @@ class NetworkManager:
         Returns:
             a reward for training a model with the given actions
         '''
-        with tf.Session(graph=tf.Graph()) as network_sess:
+        # existing_graph = tf.compat.v1.get_default_graph()
+
+        # with tf.compat.v1.Session(graph=existing_graph).as_default() as network_sess:
+        with tf.compat.v1.Session(graph=tf.compat.v1.Graph()).as_default() as network_sess:
             K.set_session(network_sess)
 
             # generate a submodel given predicted actions
             model = model_fn(actions)  # type: Model
-            
             learning_rate = CustomSchedule(128)
-            optimizer = tf.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
+            optimizer = tf.compat.v1.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
                                                 epsilon=1e-9)
             model.compile(
                 loss=masked_loss,
                 optimizer=optimizer,
                 metrics=[masked_accuracy])
-
-            model.fit(self.train_batches,
+            
+            model.fit(self.train_batches, 
                             epochs=self.epochs,
                             validation_data=self.val_batches)
 

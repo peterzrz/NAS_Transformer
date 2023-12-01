@@ -44,13 +44,11 @@ import tensorflow as tf
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
-import tensorflow_text 
 
-
-
+import tensorflow_text
 
 model_name = 'ted_hrlr_translate_pt_en_converter'
-tf.keras.utils.get_file(
+tf.compat.v1.keras.utils.get_file(
     f'{model_name}.zip',
     f'https://storage.googleapis.com/download.tensorflow.org/models/{model_name}.zip',
     cache_dir='.', cache_subdir='', extract=True
@@ -81,8 +79,8 @@ def make_batches(ds):
       ds
       .shuffle(BUFFER_SIZE)
       .batch(BATCH_SIZE)
-      .map(prepare_batch, tf.data.AUTOTUNE)
-      .prefetch(buffer_size=tf.data.AUTOTUNE))
+      .map(prepare_batch, tf.compat.v1.data.AUTOTUNE)
+      .prefetch(buffer_size=tf.compat.v1.data.AUTOTUNE))
 
 
 
@@ -99,15 +97,15 @@ def positional_encoding(length, depth):
       [np.sin(angle_rads), np.cos(angle_rads)],
       axis=-1)
 
-  return tf.cast(pos_encoding, dtype=tf.float32)
+  return tf.compat.v1.cast(pos_encoding, dtype=tf.float32)
 
 
 
-class PositionalEmbedding(tf.keras.layers.Layer):
+class PositionalEmbedding(tf.compat.v1.keras.layers.Layer):
   def __init__(self, vocab_size, d_model):
     super().__init__()
     self.d_model = d_model
-    self.embedding = tf.keras.layers.Embedding(vocab_size, d_model, mask_zero=True)
+    self.embedding = tf.compat.v1.keras.layers.Embedding(vocab_size, d_model, mask_zero=True)
     self.pos_encoding = positional_encoding(length=2048, depth=d_model)
 
   def compute_mask(self, *args, **kwargs):
@@ -117,17 +115,17 @@ class PositionalEmbedding(tf.keras.layers.Layer):
     length = tf.shape(x)[1]
     x = self.embedding(x)
     # This factor sets the relative scale of the embedding and positonal_encoding.
-    x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
-    x = x + self.pos_encoding[tf.newaxis, :length, :]
+    x *= tf.compat.v1.math.sqrt(tf.cast(self.d_model, tf.float32))
+    x = x + self.pos_encoding[tf.compat.v1.newaxis, :length, :]
     return x
 
 
-class BaseAttention(tf.keras.layers.Layer):
+class BaseAttention(tf.compat.v1.keras.layers.Layer):
   def __init__(self, **kwargs):
     super().__init__()
-    self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
-    self.layernorm = tf.keras.layers.LayerNormalization()
-    self.add = tf.keras.layers.Add()
+    self.mha = tf.compat.v1.keras.layers.MultiHeadAttention(**kwargs)
+    self.layernorm = tf.compat.v1.keras.layers.LayerNormalization()
+    self.add = tf.compat.v1.keras.layers.Add()
 
 
 class CrossAttention(BaseAttention):
@@ -169,16 +167,16 @@ class CausalSelfAttention(BaseAttention):
     x = self.layernorm(x)
     return x
 
-class FeedForward(tf.keras.layers.Layer):
+class FeedForward(tf.compat.v1.keras.layers.Layer):
   def __init__(self, d_model, dff, dropout_rate=0.1, activation='relu'):
     super().__init__()
-    self.seq = tf.keras.Sequential([
-      tf.keras.layers.Dense(dff, activation=activation),
-      tf.keras.layers.Dense(d_model),
-      tf.keras.layers.Dropout(dropout_rate)
+    self.seq = tf.compat.v1.keras.Sequential([
+      tf.compat.v1.keras.layers.Dense(dff, activation=activation),
+      tf.compat.v1.keras.layers.Dense(d_model),
+      tf.compat.v1.keras.layers.Dropout(dropout_rate)
     ])
-    self.add = tf.keras.layers.Add()
-    self.layer_norm = tf.keras.layers.LayerNormalization()
+    self.add = tf.compat.v1.keras.layers.Add()
+    self.layer_norm = tf.compat.v1.keras.layers.LayerNormalization()
 
   def call(self, x):
     x = self.add([x, self.seq(x)])
@@ -186,7 +184,7 @@ class FeedForward(tf.keras.layers.Layer):
     return x
 
 
-class EncoderLayer(tf.keras.layers.Layer):
+class EncoderLayer(tf.compat.v1.keras.layers.Layer):
   def __init__(self,*, d_model, num_heads, dff, dropout_rate=0.1, activation = 'relu'):
     super().__init__()
 
@@ -195,7 +193,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         key_dim=d_model,
         dropout=dropout_rate)
 
-    self.ffn = FeedForward(d_model, dff, activation)
+    self.ffn = FeedForward(d_model, dff, dropout_rate, activation)
 
   def call(self, x):
     x = self.self_attention(x)
@@ -203,7 +201,7 @@ class EncoderLayer(tf.keras.layers.Layer):
     return x
 
 
-class Encoder(tf.keras.layers.Layer):
+class Encoder(tf.compat.v1.keras.layers.Layer):
   def __init__(self, *, num_layers, d_model, num_heads,
                dff, vocab_size, dropout_rate=0.1, activation = []):
     super().__init__()
@@ -224,7 +222,7 @@ class Encoder(tf.keras.layers.Layer):
                      activation = activation[i]
                      )
         for i in range(num_layers)]
-    self.dropout = tf.keras.layers.Dropout(dropout_rate)
+    self.dropout = tf.compat.v1.keras.layers.Dropout(dropout_rate)
 
   def call(self, x):
     # `x` is token-IDs shape: (batch, seq_len)
@@ -239,7 +237,7 @@ class Encoder(tf.keras.layers.Layer):
     return x  # Shape `(batch_size, seq_len, d_model)`.
 
 
-class DecoderLayer(tf.keras.layers.Layer):
+class DecoderLayer(tf.compat.v1.keras.layers.Layer):
   def __init__(self,
                *,
                d_model,
@@ -272,7 +270,7 @@ class DecoderLayer(tf.keras.layers.Layer):
     return x
 
 
-class Decoder(tf.keras.layers.Layer):
+class Decoder(tf.compat.v1.keras.layers.Layer):
   def __init__(self, *, num_layers, d_model, num_heads, dff, vocab_size,
                dropout_rate=0.1, activation = []):
     super(Decoder, self).__init__()
@@ -285,7 +283,7 @@ class Decoder(tf.keras.layers.Layer):
 
     self.pos_embedding = PositionalEmbedding(vocab_size=vocab_size,
                                              d_model=d_model)
-    self.dropout = tf.keras.layers.Dropout(dropout_rate)
+    self.dropout = tf.compat.v1.keras.layers.Dropout(dropout_rate)
     self.dec_layers = [
         DecoderLayer(d_model=d_model, num_heads=num_heads,
                      dff=dff, dropout_rate=dropout_rate, activation = activation[i])
@@ -315,7 +313,7 @@ dff = 512
 num_heads = 8
 dropout_rate = 0.1
 
-class Transformer(tf.keras.Model):
+class Transformer(tf.compat.v1.keras.Model):
   def __init__(self, *, num_layers, d_model, num_heads, dff,
                input_vocab_size, target_vocab_size, dropout_rate=0.1, activation_encoder = [], activation_decoder = []):
     super().__init__()
@@ -331,7 +329,7 @@ class Transformer(tf.keras.Model):
                            dropout_rate=dropout_rate,
                            activation = activation_decoder)
 
-    self.final_layer = tf.keras.layers.Dense(target_vocab_size)
+    self.final_layer = tf.compat.v1.keras.layers.Dense(target_vocab_size)
 
   def call(self, inputs):
     # To use a Keras model with `.fit` you must pass all your inputs in the
@@ -357,16 +355,16 @@ class Transformer(tf.keras.Model):
 
 
 
-class Translator(tf.Module):
+class Translator(tf.compat.v1.Module):
   def __init__(self, tokenizers, transformer):
     self.tokenizers = tokenizers
     self.transformer = transformer
 
   def __call__(self, sentence, max_length=MAX_TOKENS):
     # The input sentence is Portuguese, hence adding the `[START]` and `[END]` tokens.
-    assert isinstance(sentence, tf.Tensor)
+    assert isinstance(sentence, tf.compat.v1.Tensor)
     if len(sentence.shape) == 0:
-      sentence = sentence[tf.newaxis]
+      sentence = sentence[tf.compat.v1.newaxis]
 
     sentence = self.tokenizers.pt.tokenize(sentence).to_tensor()
 
@@ -375,16 +373,16 @@ class Translator(tf.Module):
     # As the output language is English, initialize the output with the
     # English `[START]` token.
     start_end = self.tokenizers.en.tokenize([''])[0]
-    start = start_end[0][tf.newaxis]
-    end = start_end[1][tf.newaxis]
+    start = start_end[0][tf.compat.v1.newaxis]
+    end = start_end[1][tf.compat.v1.newaxis]
 
     # `tf.TensorArray` is required here (instead of a Python list), so that the
     # dynamic-loop can be traced by `tf.function`.
-    output_array = tf.TensorArray(dtype=tf.int64, size=0, dynamic_size=True)
+    output_array = tf.compat.v1.TensorArray(dtype=tf.int64, size=0, dynamic_size=True)
     output_array = output_array.write(0, start)
 
-    for i in tf.range(max_length):
-      output = tf.transpose(output_array.stack())
+    for i in tf.compat.v1.range(max_length):
+      output = tf.compat.v1.transpose(output_array.stack())
       predictions = self.transformer([encoder_input, output], training=False)
 
       # Select the last token from the `seq_len` dimension.
