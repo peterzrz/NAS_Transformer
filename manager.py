@@ -54,7 +54,7 @@ class NetworkManager:
     '''
     Helper class to manage the generation of subnetwork training given a dataset
     '''
-    def __init__(self, train_batches, val_batches, epochs=20, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0):
+    def __init__(self, dataset, epochs=20, child_batchsize=128, acc_beta=0.8, clip_rewards=0.0):
         '''
         Manager which is tasked with creating subnetworks, training them on a dataset, and retrieving
         rewards in the term of accuracy, which is passed to the controller RNN.
@@ -67,8 +67,7 @@ class NetworkManager:
             clip_rewards: float - to clip rewards in [-range, range] to prevent
                 large weight updates. Use when training is highly unstable.
         '''
-        self.train_batches = train_batches
-        self.val_batches = val_batches
+        self.dataset = dataset
         self.epochs = epochs
         self.batchsize = child_batchsize
         self.clip_rewards = clip_rewards
@@ -109,19 +108,11 @@ class NetworkManager:
         with tf.compat.v1.Session(graph=tf.compat.v1.Graph()).as_default() as network_sess:
             K.set_session(network_sess)
 
+            x_train, y_train, x_val, y_val = self.dataset
             # generate a submodel given predicted actions
             model = model_fn(actions)  # type: Model
-            learning_rate = CustomSchedule(128)
-            optimizer = tf.compat.v1.keras.optimizers.Adam(learning_rate, beta_1=0.9, beta_2=0.98,
-                                                epsilon=1e-9)
-            model.compile(
-                loss=masked_loss,
-                optimizer=optimizer,
-                metrics=[masked_accuracy])
-            
-            model.fit(self.train_batches, 
-                            epochs=self.epochs,
-                            validation_data=self.val_batches)
+            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+            history = model.fit(x_train, y_train, batch_size=32, epochs=2, validation_data=(x_val, y_val))
 
 
             '''# train the model using Keras methods
@@ -134,7 +125,7 @@ class NetworkManager:
             '''
 
             # evaluate the model
-            loss, acc = model.evaluate(self.val_batches)
+            loss, acc = model.evaluate(x_val, y_val, batch_size=self.batchsize)
 
             # compute the reward
             reward = (acc - self.moving_acc)

@@ -8,6 +8,7 @@ from keras.utils import to_categorical
 
 import logging
 import time
+import keras
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,26 +49,6 @@ BUFFER_SIZE = 20000
 BATCH_SIZE = 64
 
   
-def prepare_batch(pt, en):
-    pt = tokenizers.pt.tokenize(pt)      # Output is ragged.
-    pt = pt[:, :MAX_TOKENS]    # Trim to MAX_TOKENS.
-    pt = pt.to_tensor()  # Convert to 0-padded dense Tensor
-
-    en = tokenizers.en.tokenize(en)
-    en = en[:, :(MAX_TOKENS+1)]
-    en_inputs = en[:, :-1].to_tensor()  # Drop the [END] tokens
-    en_labels = en[:, 1:].to_tensor()   # Drop the [START] tokens
-
-    return (pt, en_inputs), en_labels
-
-
-def make_batches(ds):
-  return (
-      ds
-      .shuffle(BUFFER_SIZE)
-      .batch(BATCH_SIZE)
-      .map(prepare_batch, tf.data.AUTOTUNE)
-      .prefetch(buffer_size=tf.data.AUTOTUNE))
 
 # construct a state space
 state_space = StateSpace()
@@ -78,24 +59,15 @@ state_space.add_state(name='activation', values=["relu", "softmax"]) # add the a
 # print the state space being searched
 state_space.print_state_space()
 
-# prepare the training data for the NetworkManager
-#fetch data
-examples, metadata = tfds.load('ted_hrlr_translate/pt_to_en',
-                               with_info=True,
-                               as_supervised=True)
+vocab_size = 20000  # Only consider the top 20k words
+maxlen = 200  # Only consider the first 200 words of each movie review
+(x_train, y_train), (x_val, y_val) = keras.datasets.imdb.load_data(num_words=vocab_size)
+print(len(x_train), "Training sequences")
+print(len(x_val), "Validation sequences")
+x_train = keras.utils.pad_sequences(x_train, maxlen=maxlen)
+x_val = keras.utils.pad_sequences(x_val, maxlen=maxlen)
 
-train_examples, val_examples = examples['train'], examples['validation']
-#Set up tokenizer
-model_name = 'ted_hrlr_translate_pt_en_converter'
-tf.keras.utils.get_file(
-    f'{model_name}.zip',
-    f'https://storage.googleapis.com/download.tensorflow.org/models/{model_name}.zip',
-    cache_dir='.', cache_subdir='', extract=True
-)
-tokenizers = tf.saved_model.load(model_name)
-
-train_batches = make_batches(train_examples)
-val_batches = make_batches(val_examples)
+dataset = [x_train, y_train, x_val, y_val]
 
 previous_acc = 0.0
 total_reward = 0.0
@@ -111,7 +83,7 @@ with policy_sess.as_default():
                             restore_controller=RESTORE_CONTROLLER)
 
 # create the Network Manager
-manager = NetworkManager(train_batches, val_batches, epochs=MAX_EPOCHS, child_batchsize=CHILD_BATCHSIZE, clip_rewards=CLIP_REWARDS,
+manager = NetworkManager(dataset, epochs=MAX_EPOCHS, child_batchsize=CHILD_BATCHSIZE, clip_rewards=CLIP_REWARDS,
                          acc_beta=ACCURACY_BETA)
 
 # get an initial random state space if controller needs to predict an
