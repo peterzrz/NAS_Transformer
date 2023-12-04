@@ -22,14 +22,12 @@ from controller import Controller, StateSpace
 from manager import NetworkManager
 from model import model_fn
 import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 
 tf.compat.v1.disable_eager_execution()
 
 # create a shared session between Keras and Tensorflow
 policy_sess = tf.compat.v1.Session()
 K.set_session(policy_sess)
-print(policy_sess)
 
 NUM_LAYERS = 4  # number of layers of the state space
 MAX_TRIALS = 250  # maximum number of models generated
@@ -54,20 +52,14 @@ BATCH_SIZE = 64
 state_space = StateSpace()
 
 # add states
-state_space.add_state(name='activation', values=["relu", "softmax"]) # add the activation tuning
+state_space.add_state(name='num_heads', values=[2, 4, 6, 8]) # add the activation tuning
 
 # print the state space being searched
 state_space.print_state_space()
 
-vocab_size = 20000  # Only consider the top 20k words
-maxlen = 200  # Only consider the first 200 words of each movie review
-(x_train, y_train), (x_val, y_val) = keras.datasets.imdb.load_data(num_words=vocab_size)
-print(len(x_train), "Training sequences")
-print(len(x_val), "Validation sequences")
-x_train = keras.utils.pad_sequences(x_train, maxlen=maxlen)
-x_val = keras.utils.pad_sequences(x_val, maxlen=maxlen)
+(x_train, y_train), (x_test, y_test) = keras.datasets.cifar10.load_data()
 
-dataset = [x_train, y_train, x_val, y_val]
+dataset = [x_train, y_train, x_test, y_test]
 
 previous_acc = 0.0
 total_reward = 0.0
@@ -107,7 +99,7 @@ for trial in range(MAX_TRIALS):
 
     # build a model, train and get reward and accuracy from the network manager
     print(policy_sess)
-    reward, previous_acc = manager.get_rewards(model_fn, state_space.parse_state_space_list(actions))
+    reward, previous_acc = manager.get_rewards(model_fn, state_space.parse_state_space_list(actions), policy_sess)
     print("Rewards : ", reward, "Accuracy : ", previous_acc)
 
     with policy_sess.as_default():

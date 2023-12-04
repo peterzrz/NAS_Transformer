@@ -1,5 +1,5 @@
 import numpy as np
-
+import keras
 from keras.models import Model
 from keras import backend as K
 from keras.callbacks import ModelCheckpoint
@@ -76,7 +76,7 @@ class NetworkManager:
         self.beta_bias = acc_beta
         self.moving_acc = 0.0
 
-    def get_rewards(self, model_fn, actions):
+    def get_rewards(self, model_fn, actions, policy_sess_test):
         '''
         Creates a subnetwork given the actions predicted by the controller RNN,
         trains it on the provided dataset, and then returns a reward.
@@ -105,47 +105,70 @@ class NetworkManager:
         # existing_graph = tf.compat.v1.get_default_graph()
 
         # with tf.compat.v1.Session(graph=existing_graph).as_default() as network_sess:
-        with tf.compat.v1.Session(graph=tf.compat.v1.Graph()).as_default() as network_sess:
-            K.set_session(network_sess)
+        # with tf.compat.v1.Session(graph=tf.compat.v1.Graph()).as_default() as network_sess:
+        K.set_session(policy_sess_test)
 
-            x_train, y_train, x_val, y_val = self.dataset
-            # generate a submodel given predicted actions
-            model = model_fn(actions)  # type: Model
-            model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
-            history = model.fit(x_train, y_train, batch_size=32, epochs=2, validation_data=(x_val, y_val))
+        # generate a submodel given predicted actions
+        model = model_fn(actions)  # type: Model
+        x_train, y_train, x_val, y_val = self.dataset
+        
+        learning_rate = 0.001
+        weight_decay = 0.0001
+        
+        batch_size = 256
+        num_epochs = 10 
+        #optimizer = keras.optimizers.Adam(learning_rate=learning_rate, weight_decay=weight_decay)
+
+        model.compile(
+            optimizer="adam",
+            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            metrics=[
+                keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
+                keras.metrics.SparseTopKCategoricalAccuracy(5, name="top-5-accuracy"),
+            ],
+        )
+        """
+        checkpoint_filepath = "/tmp/checkpoint.weights.h5"
+        checkpoint_callback = keras.callbacks.ModelCheckpoint(
+            checkpoint_filepath,
+            monitor="val_accuracy",
+            save_best_only=True,
+            save_weights_only=True,
+        )
+        """
+
+        history = model.fit(
+            x=x_train,
+            y=y_train,
+            batch_size=batch_size,
+            epochs=num_epochs,
+            validation_split=0.1,
+            #callbacks=[checkpoint_callback],
+        )
 
 
-            '''# train the model using Keras methods
-            model.fit(X_train, y_train, batch_size=self.batchsize, epochs=self.epochs,
-                      verbose=1, validation_data=(X_val, y_val),
-                      callbacks=[ModelCheckpoint('weights/temp_network.h5',
-                                                 monitor='val_acc', verbose=1,
-                                                 save_best_only=True,
-                                                 save_weights_only=True)])
-            '''
+        # evaluate the model
+        loss, acc = model.evaluate(x_val, y_val, batch_size=self.batchsize)
 
-            # evaluate the model
-            loss, acc = model.evaluate(x_val, y_val, batch_size=self.batchsize)
+        # compute the reward
+        reward = (acc - self.moving_acc)
 
-            # compute the reward
-            reward = (acc - self.moving_acc)
+        # if rewards are clipped, clip them in the range -0.05 to 0.05
+        if self.clip_rewards:
+            reward = np.clip(reward, -0.05, 0.05)
 
-            # if rewards are clipped, clip them in the range -0.05 to 0.05
-            if self.clip_rewards:
-                reward = np.clip(reward, -0.05, 0.05)
+        # update moving accuracy with bias correction for 1st update
+        if self.beta > 0.0 and self.beta < 1.0:
+            self.moving_acc = self.beta * self.moving_acc + (1 - self.beta) * acc
+            self.moving_acc = self.moving_acc / (1 - self.beta_bias)
+            self.beta_bias = 0
 
-            # update moving accuracy with bias correction for 1st update
-            if self.beta > 0.0 and self.beta < 1.0:
-                self.moving_acc = self.beta * self.moving_acc + (1 - self.beta) * acc
-                self.moving_acc = self.moving_acc / (1 - self.beta_bias)
-                self.beta_bias = 0
+            reward = np.clip(reward, -0.1, 0.1)
 
-                reward = np.clip(reward, -0.1, 0.1)
-
-            print()
-            print("Manager: EWA Accuracy = ", self.moving_acc)
+        print()
+        print("Manager: EWA Accuracy = ", self.moving_acc)
 
         # clean up resources and GPU memory
-        network_sess.close()
+        # network_sess.close()
 
         return reward, acc
