@@ -127,7 +127,7 @@ class NetworkManager:
                 keras.metrics.SparseTopKCategoricalAccuracy(5, name="top-5-accuracy"),
             ],
         )
-        """
+        
         checkpoint_filepath = "/tmp/checkpoint.weights.h5"
         checkpoint_callback = keras.callbacks.ModelCheckpoint(
             checkpoint_filepath,
@@ -135,7 +135,7 @@ class NetworkManager:
             save_best_only=True,
             save_weights_only=True,
         )
-        """
+        
 
         history = model.fit(
             x=x_train,
@@ -143,7 +143,7 @@ class NetworkManager:
             batch_size=batch_size,
             epochs=num_epochs,
             validation_split=0.1,
-            #callbacks=[checkpoint_callback],
+            callbacks=[checkpoint_callback],
         )
 
 
