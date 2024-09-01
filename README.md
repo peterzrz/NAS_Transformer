@@ -30,10 +30,14 @@ Explore the performance of the Neural Architecture Search (NAS) with a Transform
 # Implementation Details
 **Data Preprocessing:**
 - Image normalization, Resizing, Random flipping/cropping
+  
 **Divide each image into 144 patches**
+
 **Encoder**
 - Encode the patches with positional embedding
+  
 **Four Multi-Attention Layers**
+  
 **Hyperparameters to tune:**
 - num_heads: # attention heads in each layer [2, 4, 6, 8]
 - dff: The feed forward projection dimension [32, 64, 128]
@@ -71,27 +75,30 @@ manager = NetworkManager(dataset, epochs=max_epochs, batchsize=batchsize)
 | CNN | 0.742 | 0.662 |
 | Transformers |0.713| 0.650 |
 
-<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img2.png>
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img2.png">
+
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img3.png">
+
+- The lack of significant improvement in accuracy when using the more advanced ViT model shows the inability of NAS to work with ViT model. The Controller Loss graph also backs this claim up. However, this could also because of our insufficient training iterations.
+
 
 **Experiment 2: Varying # CNN layers**
 | #Layers  | 4 | 5  | 6 |  7 |
 | ------------- | ------------- | ------------- |------ | ------ |
 | Iterations to Converge | 50 | 56 | 63 | 79|
 
-<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img3.png>
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img4.png">
 
+- The NAS approach, when being applied to CNN, is very robust to the increase of hyperparameters to tune. The convergence time and #hyperparameters tend to have a linear relationship.
+  
 **Experiment 3: NAS on CIFAR 100**
 | Dataset  | CIFAR10 | CIFAR100  |
 | ------------- | ------------- | ------------- |
 | Iterations to Converge | 50 | 43 |
 
-<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img4.png>
+- As shown, the NAS approach is also insensitive to the dataset’s complexity.
 
-
-# Conclusion and Observations
-- The lack of significant improvement in accuracy when using the more advanced ViT model shows the inability of NAS to work with ViT model. The Controller Loss graph also backs this claim up. However, this could also because of our insufficient training iterations.
-
-- The NAS approach, when being applied to CNN, is very robust to the increase of hyperparameters to tune. The convergence time and #hyperparameters tend to have a linear relationship. In addition, it is insensitive to the dataset’s complexity.
+# Observations
 
 - NAS has some major limitations. There is no obvious method to tune its “own” hyperparameters: exploration constant, # training epochs, etc. It is also sensitive to the random hyperparameter initialization.
 
