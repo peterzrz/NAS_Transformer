@@ -12,22 +12,20 @@ A Neural Architecture Search uses Reinforcement Learning to learn the optimal hy
 
 <img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img1.png">
 
-- We plan to utilize the transformer model, specifically the Vision Transformer (ViT) model, as a replacement of CNN model used in the previous NAS paper.
+- Apply the transformer model, specifically the Vision Transformer (ViT) model, as a replacement of CNN model used in the previous NAS paper.
 
-- To be specific, we would generate hyperparameters for the trans- former and test if the NAS method is still robust in this circumstance
+- Generate hyperparameters for the transformer and test if the NAS method is still robust in this circumstance
 
-- The main task environment we will have our model interact with is the CIFAR-10 data-set, which contains 60, 000 32x32 color images split up into 10 classes of 6000 images. 
-
-- Our NAS will search for a model that fits CIFAR-10, measure the performance of the best transformer model to visual problems, and compare it to the experiments done with a standard CNN.
+- CIFAR-10 dataset
 
 # Methodology
-Our investigation will be to explore the performance of the Neural Architecture Search (NAS) with a Transformer on different types of datasets ranging from visual to text-based. 
+Explore the performance of the Neural Architecture Search (NAS) with a Transformer on different types of datasets ranging from visual to text-based. 
 
-- We will first build the RNN controllers as described by the paper. This RNN model will then predict the optimal hyperparameters, the # of heads, for a transformer model on the Cifar-10 dataset and the Portuguese to English dataset. 
-- Then, we will evaluate the transformer model based on its accuracy, and utilize this metric as a feedback to adjust the RNN prediction. 
-- Eventually, we fine-tune our best transformer model among all trials and examine its validation accuracy. 
+- Build the RNN controllers as described by the paper. This RNN model will then predict the optimal hyperparameters, the # of heads, for a transformer model on the Cifar-10 dataset and the Portuguese to English dataset. 
+- Evaluate the transformer model based on its accuracy, and utilize this metric as a feedback to adjust the RNN prediction. 
+- Fine-tune the best transformer model among all trials and examine its validation accuracy. 
 
-Our idea is to compare the results from the transformer and the results from the paper’s CNN model, and discuss in detail how the complication of transformers might have given rise to the differences.
+**Goal:** Compare the results from the transformer and the results from the paper’s CNN model, and discuss in detail how the complication of transformers might have given rise to the differences.
 
 # Implementation Details
 **Data Preprocessing:**
@@ -48,8 +46,11 @@ At a high level : For full training details, please see `train.py`.
 state_space = StateSpace()
 
 # add states
-state_space.add_state(name='kernel', values=[1, 3])
-state_space.add_state(name='filters', values=[16, 32, 64])
+state_space.add_state(name='num_heads', values=[2, 4, 6, 8]) # add the activation tuning
+state_space.add_state(name='dff', values=[32, 64, 128])
+
+# load the dataset
+(x_train, y_train), (x_test, y_test) = keras.datasets.cifar10.load_data()
 
 # create the managers
 controller = Controller(tf_session, num_layers, state_space)
@@ -87,15 +88,12 @@ manager = NetworkManager(dataset, epochs=max_epochs, batchsize=batchsize)
 <img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img4.png>
 
 
-# Conclusion
+# Conclusion and Observations
 - The lack of significant improvement in accuracy when using the more advanced ViT model shows the inability of NAS to work with ViT model. The Controller Loss graph also backs this claim up. However, this could also because of our insufficient training iterations.
 
-- We observed that the NAS approach, when being applied to CNN, is very robust to the increase of hyperparameters to tune. The convergence time and #hyperparameters tend to have a linear relationship. In addition, it is insensitive to the dataset’s complexity.
+- The NAS approach, when being applied to CNN, is very robust to the increase of hyperparameters to tune. The convergence time and #hyperparameters tend to have a linear relationship. In addition, it is insensitive to the dataset’s complexity.
 
 - NAS has some major limitations. There is no obvious method to tune its “own” hyperparameters: exploration constant, # training epochs, etc. It is also sensitive to the random hyperparameter initialization.
-
-- As a next step, we want to devote more GPU on Transformer to account for its abnormal behaviors and discover methods of finding optimal constants/hyperparameters for the Controller.
-
 
 # Acknowledgements
 Code heavily inspired by [wallarm/nascell-automl](https://github.com/wallarm/nascell-automl)
