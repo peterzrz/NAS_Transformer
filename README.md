@@ -7,8 +7,10 @@ Basic implementation of Controller RNN from [Neural Architecture Search with Rei
 - Transformer model is a neural network known for its self-attention mechanism that allows the model to capture relationships between distant elements in a sequence
 
 # Model Setup
-** NAS **
+**NAS:**
 A Neural Architecture Search uses Reinforcement Learning to learn the optimal hyperparameters to train a child network 
+
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img1.png">
 
 - We plan to utilize the transformer model, specifically the Vision Transformer (ViT) model, as a replacement of CNN model used in the previous NAS paper.
 
@@ -62,17 +64,27 @@ manager = NetworkManager(dataset, epochs=max_epochs, batchsize=batchsize)
 
 # Result
 
-**Experiment 1 : CNN vs. Transformers **
+**Experiment 1 : CNN vs. Transformers**
 | ------------  | Training Loss | Test Loss    |
 | ------------- | ------------- | ------------- | 
 | CNN | 0.742 | 0.662 |
 | Transformers |0.713| 0.650 |
 
-** Experiment 2: Varying # CNN layers **
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img2.png>
 
-** Experiment 3: NAS on CIFAR 100 **
+**Experiment 2: Varying # CNN layers**
+| #Layers  | 4 | 5  | 6 |  7 |
+| ------------- | ------------- | ------------- |------ | ------ |
+| Iterations to Converge | 50 | 56 | 63 | 79|
 
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img3.png>
 
+**Experiment 3: NAS on CIFAR 100**
+| Dataset  | CIFAR10 | CIFAR100  |
+| ------------- | ------------- | ------------- |
+| Iterations to Converge | 50 | 43 |
+
+<img src="https://github.com/peterzrz/NAS_Transformer/blob/master/images/img4.png>
 
 
 # Conclusion
